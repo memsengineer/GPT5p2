@@ -53,7 +53,10 @@ DMA_HandleTypeDef hdma_sai2_a;
 DMA_HandleTypeDef hdma_sai2_b;
 
 /* USER CODE BEGIN PV */
-
+#define MIC_FRAME_SAMPLES   1024u   // per channel
+static int16_t mic_buffer[MIC_FRAME_SAMPLES * 2]; // stereo interleaved L/R
+static volatile uint8_t mic_half_ready = 0;
+static volatile uint8_t mic_full_ready = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,7 +74,21 @@ static void MX_LTDC_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void HAL_SAI_RxHalfCpltCallback(SAI_HandleTypeDef *hsai)
+{
+  if (hsai->Instance == SAI2_Block_B)
+  {
+    mic_half_ready = 1;
+  }
+}
 
+void HAL_SAI_RxCpltCallback(SAI_HandleTypeDef *hsai)
+{
+  if (hsai->Instance == SAI2_Block_B)
+  {
+    mic_full_ready = 1;
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -112,7 +129,10 @@ int main(void)
   MX_I2C1_Init();
   MX_LTDC_Init();
   /* USER CODE BEGIN 2 */
-
+  if (HAL_SAI_Receive_DMA(&hsai_BlockB2, (uint8_t *)mic_buffer, MIC_FRAME_SAMPLES * 2) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -121,7 +141,20 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+
+      /* USER CODE BEGIN 3 */
+      if (mic_half_ready)
+      {
+        mic_half_ready = 0;
+        // mic_buffer[0 .. MIC_FRAME_SAMPLES-1] just updated
+      }
+
+      if (mic_full_ready)
+      {
+        mic_full_ready = 0;
+        // mic_buffer[MIC_FRAME_SAMPLES .. (2*MIC_FRAME_SAMPLES-1)] just updated
+      }
+
   }
   /* USER CODE END 3 */
 }
